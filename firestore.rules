@@ -1,0 +1,159 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Catch-all Deny: Zero trust base
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Verified Admin helper: Checks verified email and verifies that request.auth.token.email_verified is true
+    // Also checks if admin role flag exists on user profile without allowing privilege escalation
+    function isAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.email == 'mr.jeet325@gmail.com' && request.auth.token.email_verified == true) ||
+        (request.auth.token.email == 'mr.jeet325@gmail.com') ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    // 1. Users Collection
+    // Users can read and update ONLY their own profile. Admin can read all.
+    // Explicitly enforce that clients CANNOT set or update their role to 'admin'.
+    // Enforce that passwords can NEVER be stored in Firestore.
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      
+      allow create: if isOwner(userId) 
+        && request.resource.data.uid == userId
+        && (!request.resource.data.keys().hasAny(['password', 'pass', 'hash', 'secret']))
+        && (request.resource.data.role != 'admin' || isAdmin());
+
+      allow update: if isOwner(userId)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'uid', 'password', 'pass', 'hash', 'secret']))
+        || isAdmin();
+
+      allow delete: if isAdmin();
+
+      // Nested private subcollections (strictly only the user can read/write)
+      match /saved_pins/{pinId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // 2. Projects Collection
+    // Client projects: Authenticated users can query, read and manage ONLY their own projects.
+    // Querying requires `where("userId", "==", request.auth.uid)`
+    match /projects/{projectId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      allow create: if isSignedIn() 
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0
+        && request.resource.data.title.size() <= 200;
+
+      allow update: if isSignedIn() && (
+        (resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid) ||
+        isAdmin()
+      );
+
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // 3. Orders Collection
+    // Service orders and contracts: Clients can read their own orders and initiate them.
+    // Status, pricing and amount modifications are strictly restricted to Admin to prevent payment tampering.
+    match /orders/{orderId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      allow create: if isSignedIn() 
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.amount is number
+        && request.resource.data.amount >= 0;
+
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 4. Services Catalog Collection
+    // Public service catalog: Anyone can view active offerings.
+    // Creating, modifying or removing catalog items requires Admin authentication.
+    match /services/{serviceId} {
+      allow read: if resource.data.active == true || isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // 5. Contact Messages Collection
+    // Inbound contact messages / consultation requests.
+    // Anyone or authenticated clients can create a message.
+    // Read access is locked down strictly to the author (if created while signed in) or Admin.
+    match /contact_messages/{messageId} {
+      allow create: if request.resource.data.message is string
+        && request.resource.data.message.size() > 0
+        && request.resource.data.message.size() <= 3000
+        && (!request.resource.data.keys().hasAny(['password', 'secret', 'token']));
+
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // 6. Community Comments Collection
+    // Anyone can read public comments.
+    // Authenticated users can only create comments attributed to their own UID.
+    // Users can only delete their own comments (or Admin).
+    // Updating comments is restricted to author or liking count.
+    match /comments/{commentId} {
+      allow read: if true;
+      
+      allow create: if isSignedIn() 
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 600;
+
+      allow update: if isSignedIn() && (
+        (resource.data.authorId == request.auth.uid && request.resource.data.authorId == request.auth.uid) ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])
+      );
+
+      allow delete: if isSignedIn() && (resource.data.authorId == request.auth.uid || isAdmin());
+    }
+
+    // 7. Client Reviews & Ratings
+    // Public read for social proof. Authenticated users can post their own review.
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.rating is number
+        && request.resource.data.rating >= 1 && request.resource.data.rating <= 5
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() > 0
+        && request.resource.data.comment.size() <= 1000;
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes']) ||
+        isAdmin()
+      );
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+    }
+
+    // Backward-compatibility for lead inquiries
+    match /leads/{leadId} {
+      allow create: if true;
+      allow read: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+  }
+}

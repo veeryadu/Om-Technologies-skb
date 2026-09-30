@@ -1,0 +1,6 @@
+{
+  "name": "Nexora AI Landing Page Showcase",
+  "description": "Modern AI landing page design inspiration featuring dark UI, interactive 3D particle globe, SaaS feature highlights, and interactive showcase panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

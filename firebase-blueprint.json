@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role and contact metadata",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "photoURL": { "type": "string", "maxLength": 500 },
+        "role": { "type": "string", "enum": ["client", "admin"] },
+        "createdAt": { "type": "string" },
+        "lastLogin": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "Client AI website, app, or automation project",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 150 },
+        "category": { "type": "string", "maxLength": 80 },
+        "status": { "type": "string", "enum": ["planning", "in-development", "review", "completed"] },
+        "budget": { "type": "string", "maxLength": 50 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userId", "title", "status"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Client service purchase, subscription, or enterprise contract",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "serviceId": { "type": "string", "maxLength": 128 },
+        "serviceName": { "type": "string", "maxLength": 150 },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "in_progress", "delivered", "cancelled"] },
+        "paymentMethod": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["userId", "serviceName", "amount", "status"]
+    },
+    "Service": {
+      "title": "Service",
+      "description": "Published AI products, automations, and custom packages",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 150 },
+        "tagline": { "type": "string", "maxLength": 200 },
+        "category": { "type": "string", "maxLength": 80 },
+        "price": { "type": "number" },
+        "deliveryDays": { "type": "number" },
+        "features": { "type": "array" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "category", "price", "active"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "Inbound inquiry or technical consultation request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "subject": { "type": "string", "maxLength": 150 },
+        "message": { "type": "string", "maxLength": 1500 },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["email", "message"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "Public design discussion review",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "author": { "type": "string", "maxLength": 80 },
+        "avatar": { "type": "string", "maxLength": 500 },
+        "role": { "type": "string", "maxLength": 60 },
+        "text": { "type": "string", "maxLength": 500 },
+        "likes": { "type": "number" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["authorId", "author", "text"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Private user profile and metadata document"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "User development projects and custom automation builds"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "User service orders, invoices, and active subscriptions"
+    },
+    "/services/{serviceId}": {
+      "schema": "Service",
+      "description": "Public catalog of AI offerings, automations & services"
+    },
+    "/contact_messages/{messageId}": {
+      "schema": "ContactMessage",
+      "description": "Consultation leads and contact inquiries"
+    },
+    "/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Community design discussion comments"
+    },
+    "/users/{userId}/saved_pins/{pinId}": {
+      "schema": "Project",
+      "description": "Strictly private saved bookmarks for the user"
+    }
+  }
+}
